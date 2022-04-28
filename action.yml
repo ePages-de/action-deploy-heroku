@@ -1,0 +1,65 @@
+name: Deploy to Heroku
+
+inputs:
+  heroku_api_key:
+    required: true
+  heroku_app_name:
+    required: true
+  heroku_email:
+    required: true
+  heroku_branch:
+    required: true
+  heroku_team:
+    required: true
+  mattermost_webhook_url:
+    required: true
+  mattermost_username:
+    required: true
+  github_job:
+    required: true
+  github_workflow:
+    required: true
+  github_repository:
+    required: true
+  github_run_id:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - run: |
+      HEROKU_API_KEY="${{ inputs.heroku_api_key }}"
+      echo "HEROKU_API_KEY=${HEROKU_API_KEY}" >> $GITHUB_ENV
+    - run: heroku maintenance:on --app ${{ inputs.heroku_app_name }}
+    - uses: akhileshns/heroku-deploy@v3.12.12
+      with:
+        heroku_api_key: ${{ inputs.heroku_api_key }}
+        heroku_app_name: ${{ inputs.heroku_app_name }}
+        heroku_email: ${{ inputs.heroku_email }}
+        branch: ${{ inputs.heroku_branch }}
+        team: ${{ inputs.heroku_team }}
+    - run: heroku maintenance:off --app ${{ inputs.heroku_app_name }}
+      if: failure()
+    - run: heroku run rails db:migrate --app ${{ inputs.heroku_app_name }}
+    - run: heroku maintenance:off --app ${{ inputs.heroku_app_name }}
+      if: success()
+    - uses: ePages-de/action-mattermost-notify@t42-deploy
+        with:
+          webhook-url: ${{ inputs.mattermost_webhook_url }}
+          username: ${{ inputs.mattermost_username }}
+          github-job: ${{ inputs.github_job }}
+          github-workflow: ${{ inputs.github_workflow }}
+          repository: ${{ inputs.github_repository }}
+          run-id: ${{ inputs.github_run_id }}
+          success-or-failure: failure
+      if: failure()
+    - uses: ePages-de/action-mattermost-notify@t42-deploy
+        with:
+          webhook-url: ${{ inputs.mattermost_webhook_url }}
+          username: ${{ inputs.mattermost_username }}
+          github-job: ${{ inputs.github_job }}
+          github-workflow: ${{ inputs.github_workflow }}
+          repository: ${{ inputs.github_repository }}
+          run-id: ${{ inputs.github_run_id }}
+          success-or-failure: success
+      if: success()
